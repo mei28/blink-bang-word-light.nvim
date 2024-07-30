@@ -1,196 +1,61 @@
-local vim = vim
-local w, fn, api = vim.w, vim.fn, vim.api
-local hl, autocmd, get_line, get_cursor, matchstrpos, matchadd =
-    api.nvim_set_hl,
-    api.nvim_create_autocmd,
-    api.nvim_get_current_line,
-    api.nvim_win_get_cursor,
-    fn.matchstrpos,
-    fn.matchadd
-
-local PLUG_NAME = "blink-bang-word-light"
-local enabled = false
-local prev_line = -1                -- The previous line number where the cursor was found
-local prev_start_column = math.huge -- The previous start column position of the word found
-local prev_end_column = -1          -- The previous end column position of the word found
-
 local M = {}
 
-local default_configs = {
-  max_word_length = 100,
-  min_word_length = 2,
-  excluded = {
-    filetypes = {},
-    buftypes = {
-      "prompt",
-      "terminal",
-    },
-    patterns = {},
-  },
-  highlight = {
-    underline = true,
-  },
-}
+local config = require('blink-bang-word-light.config')
+local highlight = require('blink-bang-word-light.highlight')
+require('blink-bang-word-light.commands')
 
-local function merge_config(default_opts, user_opts)
-  local default_options_type = type(default_opts)
+M.config = config
 
-  if default_options_type == type(user_opts) then
-    if default_options_type == "table" and default_opts[1] == nil then
-      for k, v in pairs(user_opts) do
-        default_opts[k] = merge_config(default_opts[k], v)
-      end
-    else
-      default_opts = user_opts
-    end
-  elseif default_opts == nil then
-    default_opts = user_opts
+local group_name = 'BlinkBangWordLight'
+local autocmd_group_id
+
+function M.enable_autocmds()
+  if not autocmd_group_id then
+    autocmd_group_id = vim.api.nvim_create_augroup(group_name, { clear = true })
   end
-  return default_opts
-end
 
-local matchdelete = function()
-  if w.blink_bang_word_light ~= nil then
-    pcall(fn.matchdelete, w.blink_bang_word_light)
-    w.blink_bang_word_light = nil
-    prev_start_column = math.huge
-    prev_end_column = -1
-  end
-end
-
-local highlight_same = function(configs)
-  if not enabled then return end
-
-  local cursor_pos = get_cursor(0)
-  local cursor_column = cursor_pos[2]
-  local cursor_line = cursor_pos[1]
-
-  if
-      prev_line == cursor_line
-      and cursor_column >= prev_start_column
-      and cursor_column < prev_end_column
-  then
-    return
-  end
-  prev_line = cursor_line
-
-  matchdelete()
-
-  local line = get_line()
-
-  if fn.type(line) == vim.v.t_blob then return end
-
-  local matches = matchstrpos(line:sub(1, cursor_column + 1), [[\w*$]])
-  local word = matches[1]
-
-  if word ~= "" then
-    prev_start_column = matches[2]
-    matches = matchstrpos(line, [[^\w*]], cursor_column + 1)
-    word = word .. matches[1]
-    prev_end_column = matches[3]
-
-    local word_len = #word
-    if word_len < configs.min_word_length or word_len > configs.max_word_length then return end
-
-    w.blink_bang_word_light =
-        matchadd(PLUG_NAME, [[\(\<\|\W\|\s\)\zs]] .. word .. [[\ze\(\s\|[^[:alnum:]_]\|$\)]], -1)
-  end
-end
-
-local arr_contains = function(tbl, value)
-  for _, v in ipairs(tbl) do
-    if v == value then return true end
-  end
-  return false
-end
-
-local matches_file_patterns = function(file_name, file_patterns)
-  for _, pattern in ipairs(file_patterns) do
-    if file_name:match(pattern) then return true end
-  end
-  return false
-end
-
-local check_disabled = function(excluded, bufnr)
-  return arr_contains(excluded.buftypes, api.nvim_get_option_value("buftype", { buf = bufnr or 0 }))
-      or arr_contains(excluded.filetypes, api.nvim_get_option_value("filetype", { buf = bufnr or 0 }))
-      or matches_file_patterns(api.nvim_buf_get_name(bufnr or 0), excluded.patterns)
-end
-
-local enable = function(configs)
-  enabled = true
-  local group = api.nvim_create_augroup(PLUG_NAME, { clear = true })
-  hl(0, PLUG_NAME, configs.highlight)
-
-  local disabled = check_disabled(configs.excluded, 0)
-  if not disabled then highlight_same(configs) end
-
-  autocmd("ColorScheme", {
-    group = group,
-    callback = function() hl(0, PLUG_NAME, configs.highlight) end,
-  })
-
-  local skip_cursormoved = false
-
-  autocmd({ "BufEnter", "WinEnter" }, {
-    group = group,
+  vim.api.nvim_create_autocmd('ColorScheme', {
+    group = autocmd_group_id,
     callback = function()
-      skip_cursormoved = true
-      vim.defer_fn(function()
-        disabled = check_disabled(configs.excluded, 0)
-        if not disabled then highlight_same(configs) end
-      end, 8)
-    end,
-  })
-
-  autocmd({ "CursorMoved", "CursorMovedI" }, {
-    group = group,
-    callback = function()
-      if skip_cursormoved then
-        skip_cursormoved = false
-      elseif not disabled then
-        highlight_same(configs)
+      if config.settings.enabled then
+        highlight.set_highlight(config.settings.highlight)
+      else
+        highlight.clear_match()
       end
     end,
   })
 
-  autocmd({ "BufLeave", "WinLeave" }, {
-    group = group,
-    callback = matchdelete,
+  vim.api.nvim_create_autocmd({ 'BufEnter', 'WinEnter' }, {
+    group = autocmd_group_id,
+    callback = function()
+      highlight.on_buf_enter(config.settings)
+    end,
+  })
+
+  vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
+    group = autocmd_group_id,
+    callback = function()
+      highlight.on_cursor_moved(config.settings)
+    end,
   })
 end
 
-local disable = function()
-  matchdelete()
-  api.nvim_del_augroup_by_name(PLUG_NAME)
-  enabled = false
+function M.disable_autocmds()
+  if autocmd_group_id then
+    vim.api.nvim_clear_autocmds({ group = autocmd_group_id })
+  end
 end
 
-local toggle = function(configs)
-  if enabled then
-    disable()
+function M.setup(user_config)
+  config.setup(user_config)
+  M.enable_autocmds()
+
+  -- Initial highlight setup
+  if config.settings.enabled then
+    highlight.set_highlight(config.settings.highlight)
   else
-    enable(configs)
+    highlight.clear_match()
   end
-end
-
-M.setup = function(user_opts)
-  local opts = merge_config(default_configs, user_opts)
-  api.nvim_create_user_command("Cursorword", function(args)
-    local arg = string.lower(args.args)
-    if arg == "enable" then
-      enable(opts)
-    elseif arg == "disable" then
-      disable()
-    elseif arg == "toggle" then
-      toggle(opts)
-    end
-  end, {
-    nargs = 1,
-    complete = function() return { "enable", "disable", "toggle" } end,
-    desc = "Enable or disable cursorword",
-  })
-  enable(opts)
 end
 
 return M
