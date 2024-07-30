@@ -139,3 +139,8 @@ The following commands are available to control the highlighting:
 
 ## License
 This plugin is licensed under the MIT License.
+
+## Similar plugins
+- [nvim-cursorword](https://github.com/xiyaowong/nvim-cursorword)
+- [stcursorword](https://github.com/sontungexpt/stcursorword)
+- [vim-illuminate](https://github.com/RRethy/vim-illuminate)
