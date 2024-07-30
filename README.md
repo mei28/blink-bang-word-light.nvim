@@ -2,6 +2,9 @@
 
 💎 Blink-Bang-Word-Light is a Neovim plugin that highlights the word under the cursor throughout the buffer. The plugin provides commands to enable, disable, and toggle the highlighting.
 
+<img src="https://github.com/user-attachments/assets/c01dd446-918d-4e99-a07d-f40545760729" alt="bbwl" width="800"/>
+
+
 ## ☀️ Features
 
 - Highlights the word under the cursor throughout the buffer.
