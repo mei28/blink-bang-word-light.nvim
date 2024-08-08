@@ -38,6 +38,13 @@ function M.enable_autocmds()
       highlight.on_cursor_moved(config.settings)
     end,
   })
+
+  vim.api.nvim_create_autocmd({ 'BufLeave', 'WinLeave' }, {
+    group = autocmd_group_id,
+    callback = function()
+      highlight.clear_match()
+    end,
+  })
 end
 
 function M.disable_autocmds()
