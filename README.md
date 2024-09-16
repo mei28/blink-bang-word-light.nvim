@@ -20,7 +20,7 @@ return {
     'mei28/blink-bang-word-light.nvim',
     event = { 'VeryLazy' },
     config = function()
-        require'luminate'.setup({
+        require('blink-bang-word-light').setup({
             -- if you want to customize, see Usage!
         })
     end
