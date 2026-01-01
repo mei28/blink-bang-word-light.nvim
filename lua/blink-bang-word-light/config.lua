@@ -16,6 +16,12 @@ config.settings = {
     guifg = nil,
     guibg = nil,
   },
+  visual_highlight = {
+    enabled = true,
+    mode = "exclusive",
+    max_selection_length = 200,
+    max_selection_lines = 3,
+  },
   enabled = true,
 }
 
