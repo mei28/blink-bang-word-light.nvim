@@ -32,10 +32,25 @@ function M.enable_autocmds()
     end,
   })
 
+  -- Visual mode transition detection
+  vim.api.nvim_create_autocmd('ModeChanged', {
+    group = autocmd_group_id,
+    pattern = { '*:[vV\x16]*', '[vV\x16]*:*' },
+    callback = function()
+      highlight.on_visual_selection(config.settings)
+    end,
+  })
+
+  -- CursorMoved: visual mode uses selection highlight, otherwise word highlight
   vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
     group = autocmd_group_id,
     callback = function()
-      highlight.on_cursor_moved(config.settings)
+      local mode = vim.fn.mode()
+      if mode:match('[vV\x16]') then
+        highlight.on_visual_selection(config.settings)
+      else
+        highlight.on_cursor_moved(config.settings)
+      end
     end,
   })
 
